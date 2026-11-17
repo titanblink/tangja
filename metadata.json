@@ -1,0 +1,6 @@
+{
+  "name": "뽑기매니저",
+  "description": "인형뽑기 오락실 사입, 재고, 기계별 공급 및 매출·수익 분석 다이어리 앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

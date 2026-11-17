@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">뽑기매니저</string>
+    <string name="app_subtitle">인형뽑기 사입 · 재고 · 수익 관리</string>
+    <string name="sign_in_google">Google 계정으로 로그인</string>
+    <string name="sign_out">로그아웃</string>
+    <string name="nav_diary">다이어리</string>
+    <string name="nav_machines">기계관리</string>
+    <string name="nav_inventory">재고·사입</string>
+    <string name="nav_analytics">분석·보충</string>
+</resources>

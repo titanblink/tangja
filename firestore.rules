@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string && dateKey.size() == 10 && dateKey.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function isValidSlot(slot) {
+      return slot is map &&
+             slot.keys().hasAll(['productId', 'productName', 'quantity', 'unitCost']) &&
+             slot.keys().hasOnly([
+               'productId', 'productName', 'quantity', 'unitCost', 'slotIndex',
+               'sellingPrice', 'totalPicked', 'todayPicked', 'todayPickedDateKey'
+             ]) &&
+             slot.productId is string && slot.productId.size() >= 1 && slot.productId.size() <= 128 &&
+             slot.productName is string && slot.productName.size() >= 1 && slot.productName.size() <= 80 &&
+             slot.quantity is int && slot.quantity >= 0 &&
+             slot.unitCost is int && slot.unitCost >= 0 &&
+             (!('slotIndex' in slot) || (slot.slotIndex is int && slot.slotIndex >= 1 && slot.slotIndex <= 40)) &&
+             (!('sellingPrice' in slot) || (slot.sellingPrice is int && slot.sellingPrice >= 0)) &&
+             (!('totalPicked' in slot) || (slot.totalPicked is int && slot.totalPicked >= 0)) &&
+             (!('todayPicked' in slot) || (slot.todayPicked is int && slot.todayPicked >= 0)) &&
+             (!('todayPickedDateKey' in slot) || (slot.todayPickedDateKey is string && (slot.todayPickedDateKey.size() == 0 || isValidDateKey(slot.todayPickedDateKey))));
+    }
+
+    function isValidMachine(data) {
+      return data.machineNumber is int && data.machineNumber >= 1 && data.machineNumber <= 100 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 40 &&
+             data.machineType in ['SINGLE_SLOT', 'FOUR_SLOT', 'LOCKER_40'] &&
+             data.active is bool &&
+             data.restockThreshold is int && data.restockThreshold >= 0 && data.restockThreshold <= 1000 &&
+             data.nextRestockDate is string && data.nextRestockDate.size() <= 10 &&
+             (data.nextRestockDate.size() == 0 || isValidDateKey(data.nextRestockDate)) &&
+             data.slots is list && data.slots.size() <= 40 &&
+             (data.machineType != 'SINGLE_SLOT' || data.slots.size() <= 1) &&
+             (data.machineType != 'FOUR_SLOT' || data.slots.size() <= 4) &&
+             (data.slots.size() == 0 || isValidSlot(data.slots[0])) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidInventoryProduct(data) {
+      return data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 80 &&
+             data.category is string && data.category.size() <= 30 &&
+             data.unitCost is int && data.unitCost >= 0 &&
+             data.warehouseQty is int && data.warehouseQty >= 0 &&
+             data.machineQty is int && data.machineQty >= 0 &&
+             data.totalPurchasedQty is int && data.totalPurchasedQty >= 0 &&
+             data.lowStockThreshold is int && data.lowStockThreshold >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPurchaseRecord(data) {
+      return isValidDateKey(data.dateKey) &&
+             data.productId is string && data.productId.size() >= 1 && data.productId.size() <= 128 &&
+             data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 80 &&
+             data.quantity is int && data.quantity > 0 &&
+             data.unitCost is int && data.unitCost >= 0 &&
+             data.totalAmount is int && data.totalAmount >= 0 &&
+             data.source in ['MANUAL', 'RECEIPT_AI'] &&
+             data.supplierName is string && data.supplierName.size() <= 80 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSupplyRecord(data) {
+      return isValidDateKey(data.dateKey) &&
+             data.machineNumber is int && data.machineNumber >= 1 && data.machineNumber <= 100 &&
+             data.machineName is string && data.machineName.size() >= 1 && data.machineName.size() <= 40 &&
+             data.productId is string && data.productId.size() >= 1 && data.productId.size() <= 128 &&
+             data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 80 &&
+             data.quantity is int && data.quantity > 0 &&
+             data.unitCost is int && data.unitCost >= 0 &&
+             data.totalAmount is int && data.totalAmount >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDailyRevenue(data) {
+      return isValidDateKey(data.dateKey) &&
+             data.machineNumber is int && data.machineNumber >= 1 && data.machineNumber <= 100 &&
+             data.revenueAmount is int && data.revenueAmount >= 0 &&
+             data.memo is string && data.memo.size() <= 120 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get, list: if false;
+      allow create, update, delete: if false;
+
+      match /machines/{machineId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(machineId);
+        allow create: if isOwner(userId) &&
+                         isValidId(machineId) &&
+                         incoming().keys().hasAll(['machineNumber', 'name', 'machineType', 'active', 'restockThreshold', 'nextRestockDate', 'slots', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['machineNumber', 'name', 'machineType', 'active', 'restockThreshold', 'nextRestockDate', 'slots', 'createdAt', 'updatedAt']) &&
+                         isValidMachine(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(machineId) &&
+                         isValidMachine(incoming()) &&
+                         incoming().machineNumber == existing().machineNumber &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'machineType', 'active', 'restockThreshold', 'nextRestockDate', 'slots', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(machineId);
+      }
+
+      match /inventory/{productId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(productId);
+        allow create: if isOwner(userId) &&
+                         isValidId(productId) &&
+                         incoming().keys().hasAll(['productName', 'category', 'unitCost', 'warehouseQty', 'machineQty', 'totalPurchasedQty', 'lowStockThreshold', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['productName', 'category', 'unitCost', 'warehouseQty', 'machineQty', 'totalPurchasedQty', 'lowStockThreshold', 'createdAt', 'updatedAt']) &&
+                         isValidInventoryProduct(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(productId) &&
+                         isValidInventoryProduct(incoming()) &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['productName', 'category', 'unitCost', 'warehouseQty', 'machineQty', 'totalPurchasedQty', 'lowStockThreshold', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(productId);
+      }
+
+      match /purchases/{purchaseId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(purchaseId);
+        allow create: if isOwner(userId) &&
+                         isValidId(purchaseId) &&
+                         incoming().keys().hasAll(['dateKey', 'productId', 'productName', 'quantity', 'unitCost', 'totalAmount', 'source', 'supplierName', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['dateKey', 'productId', 'productName', 'quantity', 'unitCost', 'totalAmount', 'source', 'supplierName', 'createdAt', 'updatedAt']) &&
+                         isValidPurchaseRecord(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(purchaseId) &&
+                         isValidPurchaseRecord(incoming()) &&
+                         incoming().productId == existing().productId &&
+                         incoming().source == existing().source &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['dateKey', 'productName', 'quantity', 'unitCost', 'totalAmount', 'supplierName', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(purchaseId);
+      }
+
+      match /supplies/{supplyId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(supplyId);
+        allow create: if isOwner(userId) &&
+                         isValidId(supplyId) &&
+                         incoming().keys().hasAll(['dateKey', 'machineNumber', 'machineName', 'productId', 'productName', 'quantity', 'unitCost', 'totalAmount', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['dateKey', 'machineNumber', 'machineName', 'productId', 'productName', 'quantity', 'unitCost', 'totalAmount', 'createdAt', 'updatedAt']) &&
+                         isValidSupplyRecord(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(supplyId) &&
+                         isValidSupplyRecord(incoming()) &&
+                         incoming().productId == existing().productId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['dateKey', 'machineNumber', 'machineName', 'productName', 'quantity', 'unitCost', 'totalAmount', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(supplyId);
+      }
+
+      match /dailyRevenues/{revenueId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(revenueId);
+        allow create: if isOwner(userId) &&
+                         isValidId(revenueId) &&
+                         incoming().keys().hasAll(['dateKey', 'machineNumber', 'revenueAmount', 'memo', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['dateKey', 'machineNumber', 'revenueAmount', 'memo', 'createdAt', 'updatedAt']) &&
+                         isValidDailyRevenue(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(revenueId) &&
+                         isValidDailyRevenue(incoming()) &&
+                         incoming().dateKey == existing().dateKey &&
+                         incoming().machineNumber == existing().machineNumber &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['revenueAmount', 'memo', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(revenueId);
+      }
+    }
+  }
+}

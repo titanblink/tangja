@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "Machine": {
+      "title": "Machine",
+      "description": "Claw machine slot configuration and current loaded prize inventory (machines 1 to 20)",
+      "type": "object",
+      "properties": {
+        "machineNumber": { "type": "integer", "description": "Machine number starting from 1 (default 20, adjustable)" },
+        "name": { "type": "string", "description": "Display label for the machine" },
+        "machineType": {
+          "type": "string",
+          "enum": ["SINGLE_SLOT", "FOUR_SLOT", "LOCKER_40"],
+          "description": "1-product machine, 4-product machine, or 40-product locker"
+        },
+        "active": { "type": "boolean", "description": "Whether the machine is currently active" },
+        "restockThreshold": { "type": "integer", "description": "Low-stock restock alert threshold" },
+        "nextRestockDate": { "type": "string", "description": "Optional YYYY-MM-DD scheduled restock date" },
+        "slots": { "type": "array", "description": "Bounded list (max 40) of loaded product slots" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["machineNumber", "name", "machineType", "active", "restockThreshold", "nextRestockDate", "slots", "createdAt", "updatedAt"]
+    },
+    "InventoryProduct": {
+      "title": "InventoryProduct",
+      "description": "Master product SKU tracking warehouse stock, machine stock, and unit cost",
+      "type": "object",
+      "properties": {
+        "productName": { "type": "string", "description": "Product name" },
+        "category": { "type": "string", "description": "Product category" },
+        "unitCost": { "type": "integer", "description": "Unit cost in KRW" },
+        "warehouseQty": { "type": "integer", "description": "Remaining quantity stored in warehouse" },
+        "machineQty": { "type": "integer", "description": "Total quantity currently loaded in machines" },
+        "totalPurchasedQty": { "type": "integer", "description": "Cumulative quantity purchased" },
+        "lowStockThreshold": { "type": "integer", "description": "Warehouse low-stock threshold" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["productName", "category", "unitCost", "warehouseQty", "machineQty", "totalPurchasedQty", "lowStockThreshold", "createdAt", "updatedAt"]
+    },
+    "PurchaseRecord": {
+      "title": "PurchaseRecord",
+      "description": "Daily product purchase (사입) transaction",
+      "type": "object",
+      "properties": {
+        "dateKey": { "type": "string", "description": "YYYY-MM-DD date string" },
+        "productId": { "type": "string", "description": "Referenced InventoryProduct ID" },
+        "productName": { "type": "string", "description": "Product name" },
+        "quantity": { "type": "integer", "description": "Purchased quantity" },
+        "unitCost": { "type": "integer", "description": "Unit cost in KRW" },
+        "totalAmount": { "type": "integer", "description": "Total purchase amount in KRW" },
+        "source": { "type": "string", "enum": ["MANUAL", "RECEIPT_AI"], "description": "Entry method" },
+        "supplierName": { "type": "string", "description": "Supplier or wholesaler name" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["dateKey", "productId", "productName", "quantity", "unitCost", "totalAmount", "source", "supplierName", "createdAt", "updatedAt"]
+    },
+    "SupplyRecord": {
+      "title": "SupplyRecord",
+      "description": "Daily machine restock/supply (공급) transaction",
+      "type": "object",
+      "properties": {
+        "dateKey": { "type": "string", "description": "YYYY-MM-DD date string" },
+        "machineNumber": { "type": "integer", "description": "Target machine 1..20" },
+        "machineName": { "type": "string", "description": "Target machine name" },
+        "productId": { "type": "string", "description": "Referenced InventoryProduct ID" },
+        "productName": { "type": "string", "description": "Supplied product name" },
+        "quantity": { "type": "integer", "description": "Supplied quantity" },
+        "unitCost": { "type": "integer", "description": "Unit cost pulled from inventory" },
+        "totalAmount": { "type": "integer", "description": "Total supply cost in KRW" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["dateKey", "machineNumber", "machineName", "productId", "productName", "quantity", "unitCost", "totalAmount", "createdAt", "updatedAt"]
+    },
+    "DailyMachineRevenue": {
+      "title": "DailyMachineRevenue",
+      "description": "Daily revenue entry for a specific claw machine",
+      "type": "object",
+      "properties": {
+        "dateKey": { "type": "string", "description": "YYYY-MM-DD date string" },
+        "machineNumber": { "type": "integer", "description": "Machine number 1..20" },
+        "revenueAmount": { "type": "integer", "description": "Daily revenue in KRW" },
+        "memo": { "type": "string", "description": "Optional note" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["dateKey", "machineNumber", "revenueAmount", "memo", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/machines/{machineId}": {
+      "schema": { "$ref": "#/entities/Machine" },
+      "description": "User-scoped claw machines (1..20) and loaded product slots"
+    },
+    "/users/{userId}/inventory/{productId}": {
+      "schema": { "$ref": "#/entities/InventoryProduct" },
+      "description": "User-scoped warehouse and machine product inventory"
+    },
+    "/users/{userId}/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/PurchaseRecord" },
+      "description": "User-scoped daily purchase records"
+    },
+    "/users/{userId}/supplies/{supplyId}": {
+      "schema": { "$ref": "#/entities/SupplyRecord" },
+      "description": "User-scoped daily machine supply records"
+    },
+    "/users/{userId}/dailyRevenues/{revenueId}": {
+      "schema": { "$ref": "#/entities/DailyMachineRevenue" },
+      "description": "User-scoped daily revenue per machine"
+    }
+  }
+}
